@@ -12,14 +12,16 @@
                 "args": [
                     "build",
                     "--bin=musescore-rip",
-                    "--package=musescore-rip"
+                    "--package=musescore-rip",
                 ],
                 "filter": {
                     "name": "musescore-rip",
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "https://musescore.com/user/1809056/scores/1019991"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {

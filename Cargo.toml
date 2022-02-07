@@ -5,8 +5,6 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Download musescore scores as svg files"
 repository = "https://github.com/lukaprsina/musescore-rip"
-author = "Luka Pršina"
-author_email = "prsinaluka@gmail.com"
 keywords = ["musescore", "svg", "download"]
 exclude = ["output/*"]
 

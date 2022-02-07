@@ -4,7 +4,7 @@ use scraper::{Html, Selector};
 use std::{fs, path::Path, thread::sleep, time::Duration};
 
 #[derive(Parser, Debug)]
-#[clap(author="Luka Pršina", version="1.0.0", about="Download musescore scores as svg files", long_about = None)]
+#[clap(author="Luka Pršina", version="0.1.0", about="Download musescore scores as svg files", long_about = None)]
 struct Args {
     url: String,
     #[clap(short, long)]
@@ -13,6 +13,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let output_path = Path::new("output");
+
+    if output_path.exists() {
+        if output_path.read_dir()?.next().is_some() {
+            panic!("Output directory already exists!");
+        }
+    } else {
+        fs::create_dir("output")?;
+    }
+
     let args = Args::parse();
     let div_class = args.div_class.unwrap_or_else(|| "vAVs3".to_string());
     let site = &args.url;
@@ -20,15 +30,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting a new web browser\nSite: {}", site);
     let sources = get_sources(site, &div_class)?;
 
-    if !Path::new("output").exists() {
-        fs::create_dir("output")?;
-    }
-
     println!("\nFound {} pages, saving into ./output", sources.len());
 
     for (pos, source) in sources.iter().enumerate() {
         let body = reqwest::get(source).await?.text().await?;
-        fs::write(Path::new(&format!("output/img{}.svg", pos)), body).unwrap();
+        fs::write(&format!("output/img{}.svg", pos), body).unwrap();
     }
 
     Ok(())
