@@ -1,7 +1,9 @@
 use clap::Parser;
+use hashbag::HashBag;
 use headless_chrome::{Browser, LaunchOptionsBuilder};
 use scraper::{Html, Selector};
 use std::{fs, path::Path, thread::sleep, time::Duration};
+use url::Url;
 
 #[derive(Parser, Debug)]
 #[clap(author="Luka Pršina", version="0.1.0", about="Download musescore scores as svg files", long_about = None)]
@@ -24,17 +26,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let args = Args::parse();
-    let div_class = args.div_class.unwrap_or_else(|| "vAVs3".to_string());
+    let div_class = args.div_class.unwrap_or("vAVs3".to_string());
     let site = &args.url;
 
     println!("Starting a new web browser\nSite: {}", site);
-    let sources = get_sources(site, &div_class)?;
+    let mut sources = get_sources(site, &div_class)?;
+    sources[0] = sources[1].clone();
 
     println!("\nFound {} pages, saving into ./output", sources.len());
+    let mut titles: HashBag<String> = HashBag::new();
 
     for (pos, source) in sources.iter().enumerate() {
-        let body = reqwest::get(source).await?.text().await?;
-        fs::write(&format!("output/img{}.svg", pos), body).unwrap();
+        let response = reqwest::get(source).await?;
+        let body = response.bytes().await?;
+        let url = Url::parse(source)?;
+
+        let title = match url.path_segments() {
+            Some(segments) => match segments.last() {
+                Some(last) => {
+                    let count = titles.insert(last.to_string());
+                    let path = Path::new(last);
+                    let stem = path.file_stem().unwrap_or_default();
+                    let extension = path.extension().unwrap_or_default();
+                    if count != 0 {
+                        format!(
+                            "{}-{}.{}",
+                            stem.to_str().expect("Can't convert URL title to string"),
+                            count,
+                            extension
+                                .to_str()
+                                .expect("Can't convert URL extension to string")
+                        )
+                    } else {
+                        last.to_string()
+                    }
+                }
+                None => format!("img{}", pos),
+            },
+
+            None => format!("img{}", pos),
+        };
+
+        fs::write(&format!("output/{}", title), body).expect("Can't write file");
     }
 
     Ok(())
@@ -46,7 +79,9 @@ fn get_sources(site: &str, div_class: &str) -> Result<Vec<String>, Box<dyn std::
     let mut sources: Vec<String> = vec![];
 
     let tab = browser.wait_for_initial_tab()?;
-    tab.navigate_to(site)?.wait_until_navigated().unwrap();
+    tab.navigate_to(site)?
+        .wait_until_navigated()
+        .expect("Can't open site");
     let divs = tab.wait_for_elements(&format!("div.{}", div_class))?;
     sleep(Duration::from_secs(1));
 
@@ -61,14 +96,21 @@ fn get_sources(site: &str, div_class: &str) -> Result<Vec<String>, Box<dyn std::
         let html = div
             .call_js_fn("function() { return this.innerHTML;}", false)?
             .value
-            .unwrap();
+            .expect("Can't get innerHTML on div");
 
-        let text = html.as_str().unwrap();
+        let text = html.as_str().expect("Can't convert HTML to string");
         let fragment = Html::parse_fragment(text);
-        let selector = Selector::parse("img").unwrap();
+        let selector = Selector::parse("img").expect("Wrong html selector");
         let mut img = fragment.select(&selector);
 
-        let src = img.next().unwrap().value().attr("src").unwrap().to_string();
+        let src = img
+            .next()
+            .expect("No image element on page")
+            .value()
+            .attr("src")
+            .expect("No src attribute on image element")
+            .to_string();
+
         if img.next().is_some() {
             println!(
                 "Found more than one image in one page, skipping.\nThis is not supported yet."
