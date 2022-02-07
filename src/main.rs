@@ -30,8 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let site = &args.url;
 
     println!("Starting a new web browser\nSite: {}", site);
-    let mut sources = get_sources(site, &div_class)?;
-    sources[0] = sources[1].clone();
+    let sources = get_sources(site, &div_class)?;
 
     println!("\nFound {} pages, saving into ./output", sources.len());
     let mut titles: HashBag<String> = HashBag::new();
@@ -46,9 +45,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(last) => {
                     let count = titles.insert(last.to_string());
                     let path = Path::new(last);
-                    let stem = path.file_stem().unwrap_or_default();
-                    let extension = path.extension().unwrap_or_default();
                     if count != 0 {
+                        let stem = path.file_stem().unwrap_or_default();
+                        let extension = path.extension().unwrap_or_default();
                         format!(
                             "{}-{}.{}",
                             stem.to_str().expect("Can't convert URL title to string"),
@@ -79,6 +78,7 @@ fn get_sources(site: &str, div_class: &str) -> Result<Vec<String>, Box<dyn std::
     let mut sources: Vec<String> = vec![];
 
     let tab = browser.wait_for_initial_tab()?;
+
     tab.navigate_to(site)?
         .wait_until_navigated()
         .expect("Can't open site");
