@@ -8,6 +8,7 @@ repository = "https://github.com/lukaprsina/musescore-rip"
 author = "Luka Pršina"
 author_email = "prsinaluka@gmail.com"
 keywords = ["musescore", "svg", "download"]
+exclude = ["output/*"]
 
 [dependencies]
 clap = { version = "3.0.14", features = ["derive"] }
