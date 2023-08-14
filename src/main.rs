@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 use clap::Parser;
 use hashbag::HashBag;
 use headless_chrome::{Browser, LaunchOptionsBuilder};
@@ -30,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let site = &args.url;
 
     println!("Starting a new web browser\nSite: {}", site);
-    let sources = get_sources(site, &div_class)?;
+    let sources = get_sources(site, &div_class).await?;
 
     println!("\nFound {} pages, saving into ./output", sources.len());
     let mut titles: HashBag<String> = HashBag::new();
@@ -72,8 +73,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn get_sources(site: &str, div_class: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let options = LaunchOptionsBuilder::default().headless(false).build()?;
+async fn get_sources(
+    site: &str,
+    div_class: &str,
+) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let options = LaunchOptionsBuilder::default()
+        .headless(false)
+        .idle_browser_timeout(Duration::from_secs(600))
+        .build()?;
     let browser = Browser::new(options)?;
     let mut sources: Vec<String> = vec![];
 
@@ -82,8 +89,17 @@ fn get_sources(site: &str, div_class: &str) -> Result<Vec<String>, Box<dyn std::
     tab.navigate_to(site)?
         .wait_until_navigated()
         .expect("Can't open site");
-    let divs = tab.wait_for_elements(&format!("div.{}", div_class))?;
-    sleep(Duration::from_secs(1));
+
+    let handle = tokio::spawn(async move {
+        let prompt = inquire::Confirm::new("Press enter when logged in");
+        let _ = prompt.prompt();
+    });
+
+    handle.await?;
+
+    let divs = tab
+        .wait_for_elements(&format!("div.{}", div_class))
+        .unwrap();
 
     for (pos, div) in divs.iter().enumerate() {
         div.scroll_into_view()?;
